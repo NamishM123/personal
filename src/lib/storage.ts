@@ -28,6 +28,10 @@ function hydrateEntries(entries: Record<string, DayEntry>): Record<string, DayEn
       date: v.date ?? k,
       narrative: v.narrative ?? '',
       dismissed: Array.isArray(v.dismissed) ? v.dismissed : [],
+      llmCache: v.llmCache,
+      completedAssignments: Array.isArray(v.completedAssignments)
+        ? v.completedAssignments
+        : [],
     };
   }
   return out;
@@ -61,6 +65,8 @@ export function loadState(): AppState {
         return {
           threads: parsed.threads.map(hydrateThread),
           entries: hydrateEntries(parsed.entries),
+          assignments: parsed.assignments ?? {},
+          canvas: parsed.canvas,
         };
       }
     }

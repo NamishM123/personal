@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import type { AppState, DayEntry, Thread } from './types';
+import type { AppState, Assignment, DayEntry, Thread } from './types';
 import { loadState, saveState } from './lib/storage';
-import { formatDatePretty, todayKey, weekStart, weekKeys } from './lib/date';
+import { formatDatePretty, todayKey, weekStart } from './lib/date';
 import { dailyGoal, dayTotal, weekTotal } from './lib/progress';
 import { ThreadCard } from './components/ThreadCard';
 import { DayEditor } from './components/DayEditor';
 import { Settings } from './components/Settings';
 import { Ring } from './components/Ring';
+import { AssignmentsPanel } from './components/AssignmentsPanel';
 
 function App() {
   const [state, setState] = useState<AppState>(() => loadState());
@@ -66,12 +67,11 @@ function App() {
 
   const weekRange = useMemo(() => {
     const start = weekStart();
-    const keys = weekKeys();
     const end = new Date(start);
     end.setDate(start.getDate() + 6);
     const fmt = (d: Date) =>
       d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    return { text: `${fmt(start)} – ${fmt(end)}`, keys };
+    return { text: `${fmt(start)} – ${fmt(end)}` };
   }, []);
 
   function upsertEntry(next: DayEntry) {
@@ -83,6 +83,68 @@ function App() {
 
   function updateThreads(threads: Thread[]) {
     setState((s) => ({ ...s, threads }));
+  }
+
+  function setProxyUrl(url: string) {
+    setState((s) => ({ ...s, canvas: { ...(s.canvas ?? {}), proxyUrl: url } }));
+  }
+
+  function setAssignments(list: Assignment[]) {
+    const map: Record<string, Assignment> = {};
+    // preserve any manual ones already present
+    for (const a of Object.values(state.assignments ?? {})) {
+      if (a.source === 'manual') map[a.id] = a;
+    }
+    for (const a of list) map[a.id] = a;
+    setState((s) => ({ ...s, assignments: map }));
+  }
+
+  function addManualAssignment(a: Assignment) {
+    setState((s) => ({
+      ...s,
+      assignments: { ...(s.assignments ?? {}), [a.id]: a },
+    }));
+  }
+
+  function setLastSync(iso: string) {
+    setState((s) => ({ ...s, canvas: { ...(s.canvas ?? {}), lastSync: iso } }));
+  }
+
+  function toggleAssignmentComplete(id: string, dueKey: string, complete: boolean) {
+    setState((s) => {
+      const nextEntries = { ...s.entries };
+
+      // Remove id from every day first — completion lives on exactly one day.
+      for (const [k, e] of Object.entries(nextEntries)) {
+        if (!e.completedAssignments?.includes(id)) continue;
+        nextEntries[k] = {
+          ...e,
+          completedAssignments: (e.completedAssignments ?? []).filter((x) => x !== id),
+        };
+      }
+
+      if (complete) {
+        const target = todayKey();
+        const existing = nextEntries[target] ??
+          ({
+            date: target,
+            narrative: '',
+            dismissed: [],
+          } as DayEntry);
+        // Prefer to credit "today" so today's bar moves; fall back to due day otherwise.
+        // Users can move the credit later by editing the date — we credit today for simplicity.
+        void dueKey;
+        nextEntries[target] = {
+          ...existing,
+          completedAssignments: [
+            ...(existing.completedAssignments ?? []),
+            id,
+          ],
+        };
+      }
+
+      return { ...s, entries: nextEntries };
+    });
   }
 
   function exportJson() {
@@ -220,8 +282,16 @@ function App() {
       </div>
 
       <main className="relative z-10 max-w-6xl mx-auto px-5 pb-12 grid grid-cols-1 lg:grid-cols-[1.1fr,1fr] gap-5">
-        <section>
+        <section className="space-y-5">
           <DayEditor threads={activeThreads} entry={entry} onChange={upsertEntry} />
+          <AssignmentsPanel
+            state={state}
+            onSetAssignments={setAssignments}
+            onSetLastSync={setLastSync}
+            onSetProxyUrl={setProxyUrl}
+            onToggleComplete={toggleAssignmentComplete}
+            onAddManual={addManualAssignment}
+          />
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">

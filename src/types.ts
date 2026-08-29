@@ -30,9 +30,33 @@ export interface DayEntry {
   narrative: string;
   /** Dismissed detection keys (so re-parsing won't re-introduce them). */
   dismissed: string[];
+  /** Cached LLM detections, keyed to the narrative hash they came from. */
+  llmCache?: {
+    hash: string;
+    detections: Detection[];
+  };
+  /** Assignments completed on this day (Canvas ids or manual ids). */
+  completedAssignments?: string[];
+}
+
+export interface Assignment {
+  id: string; // stable id (canvas:<courseId>:<assignmentId> or manual:<uuid>)
+  title: string;
+  courseName?: string;
+  dueAt: string; // ISO
+  url?: string;
+  source: 'canvas' | 'manual';
 }
 
 export interface AppState {
   threads: Thread[];
   entries: Record<string, DayEntry>;
+  /** Cached assignments (from Canvas or manually added). Keyed by id. */
+  assignments?: Record<string, Assignment>;
+  /** Canvas integration config. */
+  canvas?: {
+    /** Proxy base URL, e.g. https://myapp.vercel.app */
+    proxyUrl?: string;
+    lastSync?: string;
+  };
 }

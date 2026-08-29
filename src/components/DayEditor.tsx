@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DayEntry, Thread } from '../types';
+import type { DayEntry, Detection, Thread } from '../types';
 import { formatAmount } from '../lib/progress';
 import { parseNarrative } from '../lib/parse';
+import { mergeDetections } from '../lib/merge';
+import { isConfigured, llmParse } from '../lib/llm';
 
 interface Props {
   threads: Thread[];
@@ -9,15 +11,24 @@ interface Props {
   onChange: (entry: DayEntry) => void;
 }
 
+function narrativeHash(s: string): string {
+  // Cheap stable hash so we can cache LLM output per narrative version.
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return `h${h}`;
+}
+
 export function DayEditor({ threads, entry, onChange }: Props) {
-  // Local narrative for smooth typing; commit to parent on debounce.
   const [text, setText] = useState(entry.narrative);
   const dirtyRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const [llmStatus, setLlmStatus] = useState<'idle' | 'thinking' | 'done'>('idle');
 
   useEffect(() => {
     if (!dirtyRef.current) setText(entry.narrative);
   }, [entry.narrative, entry.date]);
 
+  // Debounced commit of narrative
   useEffect(() => {
     if (!dirtyRef.current) return;
     const t = window.setTimeout(() => {
@@ -27,11 +38,60 @@ export function DayEditor({ threads, entry, onChange }: Props) {
     return () => window.clearTimeout(t);
   }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced LLM parse (only when configured)
+  useEffect(() => {
+    if (!isConfigured()) {
+      setLlmStatus('idle');
+      return;
+    }
+    const trimmed = text.trim();
+    const hash = narrativeHash(trimmed);
+    if (!trimmed) {
+      setLlmStatus('idle');
+      return;
+    }
+    if (entry.llmCache?.hash === hash) {
+      setLlmStatus('done');
+      return;
+    }
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setLlmStatus('thinking');
+    const t = window.setTimeout(async () => {
+      try {
+        const detections = await llmParse(trimmed, threads, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+        onChange({
+          ...entry,
+          narrative: text,
+          llmCache: { hash, detections },
+        });
+        dirtyRef.current = false;
+        setLlmStatus('done');
+      } catch (err) {
+        if ((err as { name?: string }).name !== 'AbortError') {
+          // eslint-disable-next-line no-console
+          console.warn(err);
+        }
+        setLlmStatus('idle');
+      }
+    }, 700);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [text, entry.date]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const dismissed = useMemo(() => new Set(entry.dismissed ?? []), [entry.dismissed]);
-  const detections = useMemo(
-    () => parseNarrative(text, threads).filter((d) => !dismissed.has(d.key)),
-    [text, threads, dismissed],
-  );
+  const detections: Detection[] = useMemo(() => {
+    const rules = parseNarrative(text, threads);
+    const cached =
+      entry.llmCache?.hash === narrativeHash(text.trim())
+        ? entry.llmCache.detections
+        : [];
+    return mergeDetections(rules, cached).filter((d) => !dismissed.has(d.key));
+  }, [text, threads, dismissed, entry.llmCache]);
 
   function threadById(id: string): Thread | undefined {
     return threads.find((t) => t.id === id);
@@ -48,6 +108,9 @@ export function DayEditor({ threads, entry, onChange }: Props) {
 
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
+  const chipTint =
+    detections.length > 0 ? '!border-teal-500/40 !text-teal-700 !bg-teal-50' : '';
+
   return (
     <div className="card p-6">
       <div className="flex items-start justify-between mb-4">
@@ -60,20 +123,41 @@ export function DayEditor({ threads, entry, onChange }: Props) {
             Write what you did. Bars update automatically.
           </p>
         </div>
-        <div className="text-[11px] text-ink-faint tabular-nums flex items-center gap-3">
+        <div className="text-[11px] text-ink-faint tabular-nums flex items-center gap-2">
           <span>{words} words</span>
-          <span
-            className={`inline-flex items-center gap-1 chip !py-0.5 ${
-              detections.length > 0 ? '!border-teal-500/40 !text-teal-700 !bg-teal-50' : ''
-            }`}
-          >
+          <span className={`inline-flex items-center gap-1 chip !py-0.5 ${chipTint}`}>
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                detections.length > 0 ? 'bg-teal-500 animate-pulse' : 'bg-neutral-400'
+                detections.length > 0
+                  ? 'bg-teal-500 animate-pulse'
+                  : 'bg-neutral-400'
               }`}
             />
             {detections.length} detected
           </span>
+          {isConfigured() && (
+            <span
+              className={`inline-flex items-center gap-1 chip !py-0.5 ${
+                llmStatus === 'thinking'
+                  ? '!border-amber-400/40 !text-amber-700 !bg-amber-50'
+                  : llmStatus === 'done'
+                    ? '!border-teal-500/40 !text-teal-700 !bg-teal-50'
+                    : ''
+              }`}
+              title="Groq LLM extraction"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  llmStatus === 'thinking'
+                    ? 'bg-amber-500 animate-pulse'
+                    : llmStatus === 'done'
+                      ? 'bg-teal-500'
+                      : 'bg-neutral-400'
+                }`}
+              />
+              Groq {llmStatus === 'thinking' ? '…' : llmStatus === 'done' ? '✓' : ''}
+            </span>
+          )}
         </div>
       </div>
 
@@ -108,11 +192,12 @@ export function DayEditor({ threads, entry, onChange }: Props) {
             {detections.map((d) => {
               const t = threadById(d.threadId);
               if (!t) return null;
+              const isLlm = d.key.startsWith('llm:');
               return (
                 <li
                   key={d.key}
                   className="group inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full border border-line bg-white text-xs hover:border-line2 transition"
-                  title={d.text}
+                  title={d.text + (isLlm ? ' (via Groq)' : '')}
                 >
                   <span
                     className="inline-block w-1.5 h-1.5 rounded-full"
@@ -125,6 +210,11 @@ export function DayEditor({ threads, entry, onChange }: Props) {
                   <span className="text-ink-muted tabular-nums">
                     +{formatAmount(d.amount, t.unit)}
                   </span>
+                  {isLlm && (
+                    <span className="text-[9px] text-amber-700 font-semibold uppercase tracking-wider">
+                      AI
+                    </span>
+                  )}
                   <button
                     onClick={() => dismiss(d.key)}
                     className="ml-0.5 w-4 h-4 inline-flex items-center justify-center rounded-full text-ink-faint hover:text-red-500 hover:bg-red-50 transition"

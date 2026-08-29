@@ -1,21 +1,33 @@
-import type { AppState, Thread } from '../types';
+import type { AppState, Detection, Thread } from '../types';
 import { weekKeys } from './date';
 import { parseNarrative } from './parse';
+import { mergeDetections } from './merge';
 
-/** Contributions per (dateKey, threadId), computed on demand from narratives. */
-export function detectionsForDay(state: AppState, dateKey: string) {
+const COURSEWORK_ID = 'coursework';
+
+export function detectionsForDay(state: AppState, dateKey: string): Detection[] {
   const entry = state.entries[dateKey];
   if (!entry) return [];
   const dismissed = new Set(entry.dismissed ?? []);
-  return parseNarrative(entry.narrative, state.threads).filter(
-    (d) => !dismissed.has(d.key),
-  );
+  const rules = parseNarrative(entry.narrative, state.threads);
+  const cached = entry.llmCache?.detections ?? [];
+  const merged = mergeDetections(rules, cached);
+  return merged.filter((d) => !dismissed.has(d.key));
+}
+
+/** Assignments completed on a specific day. */
+export function assignmentsCompletedOn(state: AppState, dateKey: string): number {
+  return state.entries[dateKey]?.completedAssignments?.length ?? 0;
 }
 
 export function dayTotal(state: AppState, threadId: string, dateKey: string): number {
-  return detectionsForDay(state, dateKey)
+  const fromNarrative = detectionsForDay(state, dateKey)
     .filter((d) => d.threadId === threadId)
     .reduce((s, d) => s + d.amount, 0);
+  if (threadId === COURSEWORK_ID) {
+    return fromNarrative + assignmentsCompletedOn(state, dateKey);
+  }
+  return fromNarrative;
 }
 
 export function weekTotal(
@@ -29,7 +41,6 @@ export function weekTotal(
   );
 }
 
-/** Per-day amounts for the current week — array of 7 numbers, Mon..Sun. */
 export function weekDaily(
   state: AppState,
   threadId: string,

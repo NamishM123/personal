@@ -94,6 +94,20 @@ export const DEFAULT_THREADS: Thread[] = [
     ],
   },
   {
+    id: 'coursework',
+    name: 'Coursework',
+    unit: 'count',
+    weeklyGoal: 5,
+    color: '#0EA5A3',
+    defaultAmount: 1,
+    icon: '◈',
+    aliases: [
+      'assignment', 'assignments', 'hw', 'homework', 'problem set',
+      'pset', 'project', 'essay', 'paper', 'exam', 'midterm', 'final',
+      'quiz', 'submitted', 'turned in', 'finished assignment',
+    ],
+  },
+  {
     id: 'workout',
     name: 'Working Out',
     unit: 'minutes',
