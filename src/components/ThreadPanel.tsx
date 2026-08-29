@@ -14,20 +14,29 @@ export function ThreadPanel({ state, thread }: Props) {
   const dGoal = dailyGoal(thread);
   const wToday = weekTotal(state, thread.id);
   const wGoal = thread.weeklyGoal;
+  const weekPct = wGoal > 0 ? Math.round((wToday / wGoal) * 100) : 0;
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+    <div className="card p-4 hover:shadow-pop transition-shadow">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span
-            className="inline-block w-2.5 h-2.5 rounded-full"
-            style={{ backgroundColor: thread.color }}
+            className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+            style={{
+              backgroundColor: thread.color,
+              boxShadow: `0 0 0 3px ${thread.color}22`,
+            }}
           />
-          <span className="font-semibold text-neutral-100">{thread.name}</span>
+          <span className="font-semibold text-ink truncate">{thread.name}</span>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-neutral-500">
-          {thread.unit}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="chip !py-0.5 !text-[10px] uppercase tracking-wider">
+            {thread.unit}
+          </span>
+          <span className="text-xs tabular-nums font-semibold text-ink-muted">
+            {weekPct}%
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3">

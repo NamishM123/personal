@@ -27,44 +27,64 @@ export function TagModal({ threads, selectedText, onCancel, onSubmit }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onCancel}
     >
       <div
-        className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 w-full max-w-md shadow-2xl"
+        className="card p-6 w-full max-w-md shadow-pop"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold mb-3">Tag selection</h3>
-        <div className="mb-4 p-3 rounded-lg bg-neutral-950/70 border border-neutral-800 text-sm text-neutral-300 italic max-h-28 overflow-y-auto">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-ink">Tag selection</h3>
+            <p className="text-xs text-ink-faint mt-0.5">
+              Assign the highlighted text to a thread.
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="btn-ghost !px-1.5 !py-1 text-lg leading-none -mt-1"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mb-4 p-3 rounded-lg bg-paper border border-line text-sm text-ink-muted italic max-h-28 overflow-y-auto font-mono">
           "{selectedText}"
         </div>
 
-        <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
+        <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-2 font-semibold">
           Thread
         </label>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {threads.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setThreadId(t.id)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                t.id === threadId
-                  ? 'border-transparent text-neutral-950 font-semibold'
-                  : 'border-neutral-700 text-neutral-300 hover:border-neutral-500'
-              }`}
-              style={t.id === threadId ? { backgroundColor: t.color } : undefined}
-            >
-              <span
-                className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
-                style={{ backgroundColor: t.color }}
-              />
-              {t.name}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {threads.map((t) => {
+            const on = t.id === threadId;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setThreadId(t.id)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                  on
+                    ? 'bg-ink text-white border-ink'
+                    : 'bg-white text-ink-muted border-line hover:border-line2 hover:text-ink'
+                }`}
+              >
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: t.color }}
+                />
+                {t.name}
+              </button>
+            );
+          })}
         </div>
 
-        <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
-          Amount {thread ? `(${thread.unit})` : ''}
+        <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-2 font-semibold">
+          Amount{' '}
+          <span className="text-ink-faint/70 font-normal normal-case">
+            {thread ? `(${thread.unit})` : ''}
+          </span>
         </label>
         <input
           ref={inputRef}
@@ -85,22 +105,22 @@ export function TagModal({ threads, selectedText, onCancel, onSubmit }: Props) {
                 ? '0 – 100'
                 : 'e.g. 3'
           }
-          className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 focus:border-neutral-500 focus:outline-none text-neutral-100"
+          className="field"
         />
 
         <div className="flex justify-end gap-2 mt-5">
-          <button
-            onClick={onCancel}
-            className="px-3 py-2 text-sm rounded-lg text-neutral-300 hover:bg-neutral-800"
-          >
+          <button onClick={onCancel} className="btn-ghost">
             Cancel
           </button>
           <button
             onClick={submit}
-            className="px-4 py-2 text-sm rounded-lg bg-neutral-100 text-neutral-950 font-semibold hover:bg-white disabled:opacity-40"
+            className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
             disabled={!thread || !amount || parseFloat(amount) <= 0}
           >
             Add tag
+            <span className="kbd ml-1 !bg-white/10 !text-white/80 !border-white/20 !shadow-none">
+              ↵
+            </span>
           </button>
         </div>
       </div>
