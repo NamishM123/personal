@@ -9,6 +9,8 @@ interface Props {
   threads: Thread[];
   entry: DayEntry;
   onChange: (entry: DayEntry) => void;
+  /** If set, the LLM parse call goes through this Vercel proxy at /api/groq. */
+  llmProxyUrl?: string;
 }
 
 function narrativeHash(s: string): string {
@@ -18,7 +20,7 @@ function narrativeHash(s: string): string {
   return `h${h}`;
 }
 
-export function DayEditor({ threads, entry, onChange }: Props) {
+export function DayEditor({ threads, entry, onChange, llmProxyUrl }: Props) {
   const [text, setText] = useState(entry.narrative);
   const dirtyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -40,7 +42,7 @@ export function DayEditor({ threads, entry, onChange }: Props) {
 
   // Debounced LLM parse (only when configured)
   useEffect(() => {
-    if (!isConfigured()) {
+    if (!isConfigured(llmProxyUrl)) {
       setLlmStatus('idle');
       return;
     }
@@ -60,7 +62,7 @@ export function DayEditor({ threads, entry, onChange }: Props) {
     setLlmStatus('thinking');
     const t = window.setTimeout(async () => {
       try {
-        const detections = await llmParse(trimmed, threads, ctrl.signal);
+        const detections = await llmParse(trimmed, threads, llmProxyUrl, ctrl.signal);
         if (ctrl.signal.aborted) return;
         onChange({
           ...entry,
@@ -135,7 +137,7 @@ export function DayEditor({ threads, entry, onChange }: Props) {
             />
             {detections.length} detected
           </span>
-          {isConfigured() && (
+          {isConfigured(llmProxyUrl) && (
             <span
               className={`inline-flex items-center gap-1 chip !py-0.5 ${
                 llmStatus === 'thinking'

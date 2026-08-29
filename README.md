@@ -22,10 +22,14 @@ Two layers, applied to the same entry:
 
 1. **Rule parser** (always on) — keyword aliases per thread plus duration/count
    regex. Fires instantly as you type.
-2. **Groq LLM parser** (optional) — set `VITE_GROQ_API_KEY` in `.env.local` (or
-   paste it into `localStorage` under the key `groqApiKey`). Runs ~700 ms after
-   you stop typing, catches phrasing the rules miss. Detections it adds show up
-   with an **AI** tag on the chip.
+2. **Groq LLM parser** (optional) — runs ~700 ms after you stop typing, catches
+   phrasing the rules miss. Detections it adds show up with an **AI** tag on the
+   chip. Two ways to configure:
+   - **Production (recommended):** deploy to Vercel and set the env var
+     `GROQ_API_KEY` (no `VITE_` prefix). The client calls
+     `<your-app>/api/groq` and the key stays on the server.
+   - **Local dev only:** set `VITE_GROQ_API_KEY` in `.env.local`. This ships in
+     the browser bundle, so don't use it for a deployed site.
 
 Dismissed chips stay dismissed for that day.
 

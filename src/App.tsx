@@ -287,7 +287,12 @@ function App() {
 
       <main className="relative z-10 max-w-6xl mx-auto px-5 pb-12 grid grid-cols-1 lg:grid-cols-[1.1fr,1fr] gap-5">
         <section className="space-y-5">
-          <DayEditor threads={activeThreads} entry={entry} onChange={upsertEntry} />
+          <DayEditor
+            threads={activeThreads}
+            entry={entry}
+            onChange={upsertEntry}
+            llmProxyUrl={state.canvas?.proxyUrl}
+          />
           <AssignmentsPanel
             state={state}
             onSetAssignments={setAssignments}

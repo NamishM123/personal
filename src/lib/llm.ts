@@ -31,14 +31,12 @@ Rules:
 - text should be the short clause from the entry that the contribution came from.`;
 }
 
-export function isConfigured(): boolean {
-  return typeof getKey() === 'string' && getKey()!.length > 10;
+function getEnvKey(): string | undefined {
+  const env = (import.meta as unknown as { env?: Record<string, string> }).env;
+  return env?.VITE_GROQ_API_KEY;
 }
 
-function getKey(): string | undefined {
-  const env = (import.meta as unknown as { env?: Record<string, string> }).env;
-  const fromEnv = env?.VITE_GROQ_API_KEY;
-  if (fromEnv) return fromEnv;
+function getLocalStorageKey(): string | undefined {
   try {
     const stored = localStorage.getItem('groqApiKey');
     return stored ?? undefined;
@@ -47,13 +45,24 @@ function getKey(): string | undefined {
   }
 }
 
+/**
+ * The parser is "configured" if we have a way to reach Groq — either a
+ * server-side proxy at /api/groq (preferred) or a direct browser key
+ * for local development.
+ */
+export function isConfigured(proxyUrl?: string): boolean {
+  if (proxyUrl && proxyUrl.trim().length > 0) return true;
+  const key = getEnvKey() ?? getLocalStorageKey();
+  return typeof key === 'string' && key.length > 10;
+}
+
 export async function llmParse(
   text: string,
   threads: Thread[],
+  proxyUrl?: string,
   signal?: AbortSignal,
 ): Promise<Detection[]> {
-  const key = getKey();
-  if (!key || !text.trim()) return [];
+  if (!text.trim()) return [];
 
   const body = {
     model: MODEL,
@@ -65,15 +74,29 @@ export async function llmParse(
     ],
   };
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
+  let res: Response;
+  if (proxyUrl && proxyUrl.trim().length > 0) {
+    // Server-side path — key stays on Vercel.
+    res = await fetch(`${proxyUrl.replace(/\/$/, '')}/api/groq`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } else {
+    const key = getEnvKey() ?? getLocalStorageKey();
+    if (!key) return [];
+    res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  }
+
   if (!res.ok) {
     // eslint-disable-next-line no-console
     console.warn('Groq parse failed:', res.status, await res.text().catch(() => ''));
