@@ -57,6 +57,8 @@ export interface AppState {
   canvas?: {
     /** Proxy base URL, e.g. https://myapp.vercel.app */
     proxyUrl?: string;
+    /** Per-user Canvas iCal feed URL (carries its own secret). */
+    icalUrl?: string;
     lastSync?: string;
   };
 }

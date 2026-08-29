@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AppState, Assignment } from '../types';
 import { fetchUpcomingAssignments } from '../lib/canvas';
+import { fetchIcalAssignments } from '../lib/ical';
 import { todayKey, weekKeys } from '../lib/date';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
   onSetAssignments: (list: Assignment[]) => void;
   onSetLastSync: (iso: string) => void;
   onSetProxyUrl: (url: string) => void;
+  onSetIcalUrl: (url: string) => void;
   onToggleComplete: (assignmentId: string, dateKey: string, complete: boolean) => void;
   onAddManual: (a: Assignment) => void;
 }
@@ -40,6 +42,7 @@ export function AssignmentsPanel({
   onSetAssignments,
   onSetLastSync,
   onSetProxyUrl,
+  onSetIcalUrl,
   onToggleComplete,
   onAddManual,
 }: Props) {
@@ -48,9 +51,12 @@ export function AssignmentsPanel({
   const [addingOpen, setAddingOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const proxy = state.canvas?.proxyUrl ?? '';
-  const [urlDraft, setUrlDraft] = useState(proxy);
+  const ical = state.canvas?.icalUrl ?? '';
+  const [proxyDraft, setProxyDraft] = useState(proxy);
+  const [icalDraft, setIcalDraft] = useState(ical);
 
   const week = useMemo(() => new Set(weekKeys()), []);
   const today = todayKey();
@@ -89,7 +95,9 @@ export function AssignmentsPanel({
     setBusy(true);
     setError(null);
     try {
-      const list = await fetchUpcomingAssignments(proxy, 21);
+      const list = ical
+        ? await fetchIcalAssignments(proxy, ical)
+        : await fetchUpcomingAssignments(proxy, 21);
       onSetAssignments(list);
       onSetLastSync(new Date().toISOString());
     } catch (err) {
@@ -99,8 +107,10 @@ export function AssignmentsPanel({
     }
   }
 
-  function saveProxy() {
-    onSetProxyUrl(urlDraft.trim());
+  function saveConfig() {
+    onSetProxyUrl(proxyDraft.trim());
+    onSetIcalUrl(icalDraft.trim());
+    setSettingsOpen(false);
   }
 
   function submitManual() {
@@ -119,20 +129,23 @@ export function AssignmentsPanel({
   }
 
   const totalWeek =
-    groups.overdue.length +
-    groups.todayList.length +
-    groups.weekList.length;
-  const doneWeek =
-    [...groups.overdue, ...groups.todayList, ...groups.weekList].filter((a) =>
-      completed.has(a.id),
-    ).length;
+    groups.overdue.length + groups.todayList.length + groups.weekList.length;
+  const doneWeek = [...groups.overdue, ...groups.todayList, ...groups.weekList].filter(
+    (a) => completed.has(a.id),
+  ).length;
+
+  const configured = Boolean(proxy && (ical || proxy));
+  const canSync = Boolean(proxy);
 
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-            <span className="inline-block w-1 h-4 rounded-full" style={{ backgroundColor: '#0EA5A3' }} />
+            <span
+              className="inline-block w-1 h-4 rounded-full"
+              style={{ backgroundColor: '#0EA5A3' }}
+            />
             Assignments
           </h2>
           <p className="text-[11px] text-ink-faint mt-0.5">
@@ -143,13 +156,24 @@ export function AssignmentsPanel({
               <>
                 {' · '}
                 <span className="text-ink-faint">
-                  synced {new Date(state.canvas.lastSync).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  synced{' '}
+                  {new Date(state.canvas.lastSync).toLocaleTimeString(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
                 </span>
               </>
             )}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            className="btn-ghost text-xs"
+            onClick={() => setSettingsOpen((v) => !v)}
+            title="Configure Canvas sync"
+          >
+            {configured ? '⚙︎' : 'Configure'}
+          </button>
           <button
             className="btn-ghost text-xs"
             onClick={() => setAddingOpen((v) => !v)}
@@ -159,26 +183,46 @@ export function AssignmentsPanel({
           <button
             className="btn text-xs"
             onClick={sync}
-            disabled={!proxy || busy}
-            title={proxy ? 'Sync from Canvas' : 'Set proxy URL first'}
+            disabled={!canSync || busy}
+            title={canSync ? 'Sync from Canvas' : 'Configure the proxy URL first'}
           >
-            {busy ? 'Syncing…' : 'Sync Canvas'}
+            {busy ? 'Syncing…' : 'Sync'}
           </button>
         </div>
       </div>
 
-      {!proxy && (
-        <div className="mb-3 p-2.5 rounded-lg border border-dashed border-line text-xs text-ink-muted">
-          Paste your Canvas proxy URL to start syncing (e.g.{' '}
-          <span className="font-mono">https://your-app.vercel.app</span>).
-          <div className="mt-2 flex gap-1.5">
-            <input
-              value={urlDraft}
-              onChange={(e) => setUrlDraft(e.target.value)}
-              placeholder="https://your-app.vercel.app"
-              className="field !py-1 !text-xs"
-            />
-            <button className="btn text-xs" onClick={saveProxy} disabled={!urlDraft.trim()}>
+      {(settingsOpen || !proxy) && (
+        <div className="mb-3 p-3 rounded-lg border border-line bg-paper">
+          <div className="text-[11px] uppercase tracking-wider text-ink-faint font-semibold mb-2">
+            Canvas sync
+          </div>
+          <label className="block text-[11px] text-ink-muted mb-1">
+            Serverless proxy URL
+          </label>
+          <input
+            value={proxyDraft}
+            onChange={(e) => setProxyDraft(e.target.value)}
+            placeholder="https://your-app.vercel.app"
+            className="field !py-1.5 !text-xs mb-2"
+          />
+          <label className="block text-[11px] text-ink-muted mb-1">
+            Canvas iCal URL{' '}
+            <span className="text-ink-faint">
+              (Canvas → Calendar → Calendar Feed)
+            </span>
+          </label>
+          <input
+            value={icalDraft}
+            onChange={(e) => setIcalDraft(e.target.value)}
+            placeholder="https://canvas.calpoly.edu/feeds/calendars/user_...ics"
+            className="field !py-1.5 !text-xs mb-2 font-mono"
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-ink-faint">
+              Stored only in your browser. The iCal URL contains a secret —
+              rotate it in Canvas if you suspect it leaked.
+            </p>
+            <button className="btn-primary text-xs" onClick={saveConfig}>
               Save
             </button>
           </div>
@@ -186,7 +230,7 @@ export function AssignmentsPanel({
       )}
 
       {error && (
-        <div className="mb-3 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
+        <div className="mb-3 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 break-words">
           {error}
         </div>
       )}
@@ -220,14 +264,38 @@ export function AssignmentsPanel({
         </div>
       )}
 
-      <Section label="Overdue" tone="danger" items={groups.overdue} completed={completed} onToggle={onToggleComplete} />
-      <Section label="Today" tone="hot" items={groups.todayList} completed={completed} onToggle={onToggleComplete} />
-      <Section label="This week" items={groups.weekList} completed={completed} onToggle={onToggleComplete} />
-      <Section label="Later" tone="mute" items={groups.later} completed={completed} onToggle={onToggleComplete} />
+      <Section
+        label="Overdue"
+        tone="danger"
+        items={groups.overdue}
+        completed={completed}
+        onToggle={onToggleComplete}
+      />
+      <Section
+        label="Today"
+        tone="hot"
+        items={groups.todayList}
+        completed={completed}
+        onToggle={onToggleComplete}
+      />
+      <Section
+        label="This week"
+        items={groups.weekList}
+        completed={completed}
+        onToggle={onToggleComplete}
+      />
+      <Section
+        label="Later"
+        tone="mute"
+        items={groups.later}
+        completed={completed}
+        onToggle={onToggleComplete}
+      />
 
-      {assignments.length === 0 && (
+      {assignments.length === 0 && !settingsOpen && (
         <div className="p-4 rounded-lg border border-dashed border-line text-xs text-ink-faint text-center">
-          No assignments yet. Add one manually or set your Canvas proxy URL and sync.
+          No assignments yet. Add one manually, or paste your Canvas iCal URL
+          above and hit Sync.
         </div>
       )}
     </div>
@@ -286,7 +354,11 @@ function Section({
                 className="w-4 h-4 rounded border-line accent-teal-600"
               />
               <div className="flex-1 min-w-0">
-                <div className={`text-sm truncate ${done ? 'line-through text-ink-faint' : 'text-ink font-medium'}`}>
+                <div
+                  className={`text-sm truncate ${
+                    done ? 'line-through text-ink-faint' : 'text-ink font-medium'
+                  }`}
+                >
                   {a.title}
                 </div>
                 <div className="text-[11px] text-ink-faint flex items-center gap-1.5">

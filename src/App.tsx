@@ -89,6 +89,10 @@ function App() {
     setState((s) => ({ ...s, canvas: { ...(s.canvas ?? {}), proxyUrl: url } }));
   }
 
+  function setIcalUrl(url: string) {
+    setState((s) => ({ ...s, canvas: { ...(s.canvas ?? {}), icalUrl: url } }));
+  }
+
   function setAssignments(list: Assignment[]) {
     const map: Record<string, Assignment> = {};
     // preserve any manual ones already present
@@ -289,6 +293,7 @@ function App() {
             onSetAssignments={setAssignments}
             onSetLastSync={setLastSync}
             onSetProxyUrl={setProxyUrl}
+            onSetIcalUrl={setIcalUrl}
             onToggleComplete={toggleAssignmentComplete}
             onAddManual={addManualAssignment}
           />

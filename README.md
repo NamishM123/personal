@@ -31,23 +31,46 @@ Dismissed chips stay dismissed for that day.
 
 ## Canvas assignments
 
-The Canvas REST API doesn't send CORS headers, so a static Vite app can't call
-it directly. This repo ships a serverless proxy (`api/canvas.ts`) you deploy
-alongside the app on Vercel.
+Canvas doesn't send CORS headers, so a static Vite app can't call it directly.
+This repo ships two serverless proxies you can deploy alongside the app on
+Vercel — pick whichever your school allows.
+
+### Option A: personal iCal feed (recommended — no token needed)
+
+Most schools disable personal access tokens for students but leave the iCal
+feed enabled. That's a URL like
+`https://canvas.your-school.edu/feeds/calendars/user_XXXXXX.ics` — the URL
+itself carries a secret, so no token is required.
 
 1. Deploy this repo to Vercel.
-2. In the Vercel project's environment variables, set:
-   - `CANVAS_BASE_URL` — e.g. `https://canvas.your-school.edu`
-   - `CANVAS_TOKEN` — from Canvas → Account → Settings → **New Access Token**
-   - `ALLOWED_ORIGIN` — your deployment origin, or `*` while testing
-3. Open the deployed app, paste the deployment URL (e.g.
-   `https://your-app.vercel.app`) into the Assignments panel, and hit
-   **Sync Canvas**.
+2. Set the env var `ALLOWED_ORIGIN` (your deployment origin, or `*` while testing).
+3. In Canvas, click **Calendar** → scroll to the bottom of the right column →
+   **Calendar Feed** → copy the URL.
+4. Open the deployed app → click **Configure** on the Assignments panel → paste
+   your Vercel URL and the iCal URL → **Save** → **Sync**.
 
-The proxy only forwards `GET` requests to paths that start with `/api/v1/`.
+The `api/ical.ts` proxy only forwards HTTPS GETs to `*.instructure.com` and
+`canvas.<school>.edu`-style hosts under `/feeds/calendars/`. If the iCal URL
+ever leaks, rotate it in Canvas (Calendar → Calendar Feed → **Reset**).
+
+### Option B: personal access token (only if your school allows)
+
+Skip if the **+ New Access Token** button in Canvas → Account → Settings does
+nothing. Otherwise:
+
+1. Deploy this repo to Vercel and set:
+   - `CANVAS_BASE_URL` — e.g. `https://canvas.your-school.edu`
+   - `CANVAS_TOKEN` — Canvas → Account → Settings → **New Access Token**
+   - `ALLOWED_ORIGIN` — your deployment origin, or `*`
+2. Open the app, paste the Vercel URL into the Assignments panel, leave the
+   iCal field blank, hit **Sync**.
+
+The `api/canvas.ts` proxy only forwards GETs to paths starting with `/api/v1/`.
+
+### Regardless of path
 
 Assignments show up grouped by Overdue / Today / This week / Later. Checking
-one credits it to today and moves the Coursework bar. You can also add
+one credits it to today and bumps the Coursework bar. You can also add
 assignments manually — no Canvas required.
 
 ## Build
