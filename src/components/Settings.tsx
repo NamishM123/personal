@@ -12,8 +12,15 @@ const PALETTE = [
   '#EC4899', '#F97316', '#F59E0B', '#22C55E', '#EF4444',
 ];
 
+function defaultAmountFor(unit: Unit): number {
+  if (unit === 'minutes') return 30;
+  if (unit === 'percent') return 100;
+  return 1;
+}
+
 export function Settings({ state, onClose, onChange }: Props) {
   const [draft, setDraft] = useState<Thread[]>(state.threads);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   function update(id: string, patch: Partial<Thread>) {
     setDraft(draft.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -34,6 +41,8 @@ export function Settings({ state, onClose, onChange }: Props) {
         unit: 'minutes',
         weeklyGoal: 60,
         color,
+        aliases: [],
+        defaultAmount: 30,
       },
     ]);
   }
@@ -56,9 +65,8 @@ export function Settings({ state, onClose, onChange }: Props) {
           <div>
             <h3 className="text-base font-semibold text-ink">Threads</h3>
             <p className="text-xs text-ink-faint mt-0.5">
-              Configure the life threads you track and their weekly goals.
-              Daily goal is derived as{' '}
-              <span className="font-mono text-ink-muted">weekly ÷ 7</span>.
+              Configure the life threads you track, their weekly goals, and the
+              keywords the parser uses to recognize them in your journal.
             </p>
           </div>
           <button
@@ -79,55 +87,115 @@ export function Settings({ state, onClose, onChange }: Props) {
             <span></span>
           </div>
           <div className="divide-y divide-line bg-white">
-            {draft.map((t) => (
-              <div
-                key={t.id}
-                className="grid grid-cols-[36px,1fr,110px,110px,32px] gap-2 items-center px-3 py-2"
-              >
-                <label className="relative w-7 h-7 rounded-md border border-line overflow-hidden cursor-pointer flex items-center justify-center"
-                  style={{ backgroundColor: t.color }}
-                  title="Color">
-                  <input
-                    type="color"
-                    value={t.color}
-                    onChange={(e) => update(t.id, { color: e.target.value })}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </label>
-                <input
-                  type="text"
-                  value={t.name}
-                  onChange={(e) => update(t.id, { name: e.target.value })}
-                  className="field !py-1.5"
-                />
-                <select
-                  value={t.unit}
-                  onChange={(e) => update(t.id, { unit: e.target.value as Unit })}
-                  className="field !py-1.5"
-                >
-                  <option value="minutes">minutes</option>
-                  <option value="count">count</option>
-                  <option value="percent">percent</option>
-                </select>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={t.weeklyGoal}
-                  onChange={(e) =>
-                    update(t.id, { weeklyGoal: parseFloat(e.target.value) || 0 })
-                  }
-                  className="field !py-1.5 tabular-nums"
-                />
-                <button
-                  onClick={() => remove(t.id)}
-                  className="text-ink-faint hover:text-red-500 text-sm w-8 h-8 rounded-md hover:bg-red-50 transition"
-                  title="Delete thread"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+            {draft.map((t) => {
+              const open = expanded === t.id;
+              return (
+                <div key={t.id}>
+                  <div className="grid grid-cols-[36px,1fr,110px,110px,32px] gap-2 items-center px-3 py-2">
+                    <label
+                      className="relative w-7 h-7 rounded-md border border-line overflow-hidden cursor-pointer flex items-center justify-center"
+                      style={{ backgroundColor: t.color }}
+                      title="Color"
+                    >
+                      <input
+                        type="color"
+                        value={t.color}
+                        onChange={(e) => update(t.id, { color: e.target.value })}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                    </label>
+                    <button
+                      onClick={() => setExpanded(open ? null : t.id)}
+                      className="flex items-center gap-1.5 text-left px-2 py-1 rounded hover:bg-neutral-50"
+                    >
+                      <span className="text-ink-faint text-xs">{open ? '▾' : '▸'}</span>
+                      <input
+                        type="text"
+                        value={t.name}
+                        onChange={(e) => update(t.id, { name: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="field !py-1.5 !border-transparent hover:!border-line focus:!border-teal-500"
+                      />
+                    </button>
+                    <select
+                      value={t.unit}
+                      onChange={(e) =>
+                        update(t.id, {
+                          unit: e.target.value as Unit,
+                          defaultAmount: defaultAmountFor(e.target.value as Unit),
+                        })
+                      }
+                      className="field !py-1.5"
+                    >
+                      <option value="minutes">minutes</option>
+                      <option value="count">count</option>
+                      <option value="percent">percent</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={t.weeklyGoal}
+                      onChange={(e) =>
+                        update(t.id, {
+                          weeklyGoal: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="field !py-1.5 tabular-nums"
+                    />
+                    <button
+                      onClick={() => remove(t.id)}
+                      className="text-ink-faint hover:text-red-500 text-sm w-8 h-8 rounded-md hover:bg-red-50 transition"
+                      title="Delete thread"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {open && (
+                    <div className="px-3 pb-3 pt-1 bg-paper/60">
+                      <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-1 font-semibold">
+                        Keywords · comma separated
+                      </label>
+                      <textarea
+                        value={t.aliases.join(', ')}
+                        onChange={(e) =>
+                          update(t.id, {
+                            aliases: e.target.value
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                        className="field !py-2 !text-xs font-mono min-h-[70px]"
+                      />
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        <label className="block">
+                          <span className="text-[11px] uppercase tracking-wider text-ink-faint font-semibold">
+                            Fallback amount
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={t.defaultAmount}
+                            onChange={(e) =>
+                              update(t.id, {
+                                defaultAmount: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                            className="field !py-1.5 mt-1 tabular-nums"
+                          />
+                        </label>
+                        <div className="text-[11px] text-ink-faint self-end pb-2">
+                          Used when a keyword matches but no explicit amount is found.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -145,7 +213,10 @@ export function Settings({ state, onClose, onChange }: Props) {
         </div>
 
         <p className="text-xs text-ink-faint mt-3">
-          Removing a thread keeps past tags in your data but hides its bars.
+          Removing a thread keeps past narratives intact but stops it from being
+          parsed. Daily goal is derived as{' '}
+          <span className="font-mono text-ink-muted">weekly ÷ 7</span>; week
+          starts Monday.
         </p>
       </div>
     </div>

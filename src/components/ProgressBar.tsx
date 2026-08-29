@@ -2,41 +2,96 @@ interface Props {
   value: number;
   goal: number;
   color: string;
-  label?: string;
-  right?: string;
-  size?: 'sm' | 'md';
+  markers?: number[]; // percentages, 0..100
+  height?: number;
 }
 
-export function ProgressBar({ value, goal, color, label, right, size = 'md' }: Props) {
+/**
+ * Thin, glassy progress track with rounded caps, a subtle gradient fill,
+ * ambient glow on completion, and optional milestone tick marks.
+ */
+export function ProgressBar({
+  value,
+  goal,
+  color,
+  markers = [25, 50, 75],
+  height = 6,
+}: Props) {
   const pct = goal > 0 ? Math.max(0, Math.min(100, (value / goal) * 100)) : 0;
   const filled = pct >= 100;
-  const track = size === 'sm' ? 'h-1.5' : 'h-2';
+  const gradId = `bar-${color.replace('#', '')}`;
+
   return (
-    <div className="w-full">
-      {(label || right) && (
-        <div className="flex justify-between items-baseline mb-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">
-            {label}
-          </span>
-          <span
-            className={`text-xs tabular-nums ${
-              filled ? 'text-teal-700 font-semibold' : 'text-ink-muted'
-            }`}
-          >
-            {right}
-          </span>
-        </div>
-      )}
-      <div className={`w-full ${track} bg-neutral-100 rounded-full overflow-hidden ring-1 ring-inset ring-line`}>
-        <div
-          className="h-full rounded-full transition-[width] duration-500 ease-out"
+    <div className="relative w-full" style={{ height }}>
+      <svg
+        width="100%"
+        height={height}
+        className="block overflow-visible"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={color} stopOpacity="0.85" />
+            <stop offset="100%" stopColor={color} stopOpacity="1" />
+          </linearGradient>
+          <filter id={`${gradId}-glow`}>
+            <feGaussianBlur stdDeviation="2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Track */}
+        <rect
+          x="0"
+          y="0"
+          width="100%"
+          height={height}
+          rx={height / 2}
+          fill="rgba(9,27,46,0.06)"
+        />
+
+        {/* Milestone ticks (recessive) */}
+        {markers.map((m) => (
+          <rect
+            key={m}
+            x={`${m}%`}
+            y="0"
+            width="1"
+            height={height}
+            fill="rgba(9,27,46,0.14)"
+          />
+        ))}
+
+        {/* Fill */}
+        <rect
+          x="0"
+          y="0"
+          width={`${pct}%`}
+          height={height}
+          rx={height / 2}
+          fill={`url(#${gradId})`}
           style={{
-            width: `${pct}%`,
-            background: `linear-gradient(90deg, ${color}, ${color})`,
-            boxShadow: `inset 0 0 0 1px ${color}22`,
+            transition: 'width 700ms cubic-bezier(0.16,1,0.3,1)',
+            filter: filled ? `url(#${gradId}-glow)` : undefined,
           }}
         />
-      </div>
+
+        {/* Leading dot at the end of the fill */}
+        {pct > 2 && pct < 100 && (
+          <circle
+            cx={`${pct}%`}
+            cy={height / 2}
+            r={height / 2}
+            fill="#fff"
+            stroke={color}
+            strokeWidth="1.5"
+            style={{ transition: 'cx 700ms cubic-bezier(0.16,1,0.3,1)' }}
+          />
+        )}
+      </svg>
     </div>
   );
 }
