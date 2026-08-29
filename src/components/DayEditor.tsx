@@ -23,7 +23,7 @@ export function DayEditor({ threads, entry, onChange }: Props) {
     const t = window.setTimeout(() => {
       onChange({ ...entry, narrative: text });
       dirtyRef.current = false;
-    }, 220);
+    }, 120);
     return () => window.clearTimeout(t);
   }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -82,6 +82,12 @@ export function DayEditor({ threads, entry, onChange }: Props) {
         onChange={(e) => {
           dirtyRef.current = true;
           setText(e.target.value);
+        }}
+        onBlur={() => {
+          if (dirtyRef.current) {
+            onChange({ ...entry, narrative: text });
+            dirtyRef.current = false;
+          }
         }}
         placeholder="Today I went to the gym for 45 minutes, cooked pasta, applied to 8 jobs, and hung out with friends for a couple hours…"
         className="field !p-4 min-h-[240px] resize-y leading-relaxed text-[15px]"
