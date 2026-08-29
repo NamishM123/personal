@@ -1,16 +1,41 @@
 import type { AppState, Thread } from '../types';
 import { weekKeys } from './date';
+import { parseNarrative } from './parse';
 
-export function dayTotal(state: AppState, threadId: string, dateKey: string): number {
+/** Contributions per (dateKey, threadId), computed on demand from narratives. */
+export function detectionsForDay(state: AppState, dateKey: string) {
   const entry = state.entries[dateKey];
-  if (!entry) return 0;
-  return entry.tags
-    .filter((t) => t.threadId === threadId)
-    .reduce((sum, t) => sum + t.amount, 0);
+  if (!entry) return [];
+  const dismissed = new Set(entry.dismissed ?? []);
+  return parseNarrative(entry.narrative, state.threads).filter(
+    (d) => !dismissed.has(d.key),
+  );
 }
 
-export function weekTotal(state: AppState, threadId: string, refDate: Date = new Date()): number {
-  return weekKeys(refDate).reduce((sum, k) => sum + dayTotal(state, threadId, k), 0);
+export function dayTotal(state: AppState, threadId: string, dateKey: string): number {
+  return detectionsForDay(state, dateKey)
+    .filter((d) => d.threadId === threadId)
+    .reduce((s, d) => s + d.amount, 0);
+}
+
+export function weekTotal(
+  state: AppState,
+  threadId: string,
+  refDate: Date = new Date(),
+): number {
+  return weekKeys(refDate).reduce(
+    (s, k) => s + dayTotal(state, threadId, k),
+    0,
+  );
+}
+
+/** Per-day amounts for the current week — array of 7 numbers, Mon..Sun. */
+export function weekDaily(
+  state: AppState,
+  threadId: string,
+  refDate: Date = new Date(),
+): number[] {
+  return weekKeys(refDate).map((k) => dayTotal(state, threadId, k));
 }
 
 export function dailyGoal(thread: Thread): number {
