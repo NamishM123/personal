@@ -67,6 +67,7 @@ export function loadState(): AppState {
           entries: hydrateEntries(parsed.entries),
           assignments: parsed.assignments ?? {},
           canvas: parsed.canvas,
+          tasks: parsed.tasks ?? {},
         };
       }
     }

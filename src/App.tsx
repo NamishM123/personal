@@ -9,6 +9,8 @@ import { DayEditor } from './components/DayEditor';
 import { Settings } from './components/Settings';
 import { Ring } from './components/Ring';
 import { AssignmentsPanel } from './components/AssignmentsPanel';
+import { TasksPanel } from './components/TasksPanel';
+import type { Task } from './types';
 
 function App() {
   const [state, setState] = useState<AppState>(() => loadState());
@@ -112,6 +114,37 @@ function App() {
 
   function setLastSync(iso: string) {
     setState((s) => ({ ...s, canvas: { ...(s.canvas ?? {}), lastSync: iso } }));
+  }
+
+  function addTask(t: Task) {
+    setState((s) => ({ ...s, tasks: { ...(s.tasks ?? {}), [t.id]: t } }));
+  }
+
+  function toggleTask(id: string, done: boolean) {
+    setState((s) => {
+      const existing = s.tasks?.[id];
+      if (!existing) return s;
+      return {
+        ...s,
+        tasks: {
+          ...s.tasks,
+          [id]: {
+            ...existing,
+            done,
+            completedAt: done ? new Date().toISOString() : undefined,
+          },
+        },
+      };
+    });
+  }
+
+  function deleteTask(id: string) {
+    setState((s) => {
+      if (!s.tasks?.[id]) return s;
+      const next = { ...s.tasks };
+      delete next[id];
+      return { ...s, tasks: next };
+    });
   }
 
   function toggleAssignmentComplete(id: string, dueKey: string, complete: boolean) {
@@ -292,6 +325,12 @@ function App() {
             entry={entry}
             onChange={upsertEntry}
             llmProxyUrl={state.canvas?.proxyUrl}
+          />
+          <TasksPanel
+            state={state}
+            onAdd={addTask}
+            onToggle={toggleTask}
+            onDelete={deleteTask}
           />
           <AssignmentsPanel
             state={state}

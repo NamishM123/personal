@@ -48,9 +48,22 @@ export interface Assignment {
   source: 'canvas' | 'manual';
 }
 
+export interface Task {
+  id: string;
+  title: string;
+  scope: 'day' | 'week';
+  /** For day-scoped: YYYY-MM-DD. For week-scoped: the Monday YYYY-MM-DD. */
+  scopeKey: string;
+  createdAt: string; // ISO
+  done: boolean;
+  completedAt?: string; // ISO
+}
+
 export interface AppState {
   threads: Thread[];
   entries: Record<string, DayEntry>;
+  /** Ad-hoc tasks the user tracks alongside threads. Keyed by id. */
+  tasks?: Record<string, Task>;
   /** Cached assignments (from Canvas or manually added). Keyed by id. */
   assignments?: Record<string, Assignment>;
   /** Canvas integration config. */
