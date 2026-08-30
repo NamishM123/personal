@@ -94,6 +94,23 @@ export const DEFAULT_THREADS: Thread[] = [
     ],
   },
   {
+    id: 'personal',
+    name: 'Personal',
+    unit: 'count',
+    weeklyGoal: 7,
+    color: '#94A3B8',
+    defaultAmount: 1,
+    icon: '◍',
+    aliases: [
+      'cleaning', 'cleaned', 'laundry', 'dishes', 'groceries', 'grocery',
+      'errand', 'errands', 'chore', 'chores', 'tidied', 'tidy', 'vacuumed',
+      'vacuum', 'organized', 'organize', 'shopping', 'personal', 'self-care',
+      'self care', 'meditation', 'meditated', 'journaled', 'journaling',
+      'reading', 'read a book', 'took out trash', 'shower', 'skincare',
+      'walked', 'nap', 'napped',
+    ],
+  },
+  {
     id: 'coursework',
     name: 'Coursework',
     unit: 'count',

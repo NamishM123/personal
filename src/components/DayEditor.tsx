@@ -120,6 +120,14 @@ export function DayEditor({ threads, entry, onChange, llmProxyUrl }: Props) {
           <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
             <span className="inline-block w-1 h-4 rounded-full bg-teal-500" />
             Journal
+            {entry.savedAt && (
+              <span
+                className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-full border border-teal-500/40 text-teal-700 bg-teal-50"
+                title={`Saved ${new Date(entry.savedAt).toLocaleString()}`}
+              >
+                Saved
+              </span>
+            )}
           </h2>
           <p className="text-xs text-ink-faint mt-0.5">
             Write what you did. Bars update automatically.
@@ -179,6 +187,26 @@ export function DayEditor({ threads, entry, onChange, llmProxyUrl }: Props) {
         className="field !p-4 min-h-[240px] resize-y leading-relaxed text-[15px]"
         spellCheck
       />
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="text-[11px] text-ink-faint">
+          Auto-saved as you type · click <b>Save day</b> to mark this day complete.
+        </div>
+        <button
+          onClick={() => {
+            const nextNarrative = dirtyRef.current ? text : entry.narrative;
+            onChange({
+              ...entry,
+              narrative: nextNarrative,
+              savedAt: new Date().toISOString(),
+            });
+            dirtyRef.current = false;
+          }}
+          className={`btn-primary text-xs ${entry.savedAt ? 'opacity-70' : ''}`}
+        >
+          {entry.savedAt ? 'Re-save day' : 'Save day'}
+        </button>
+      </div>
 
       {detections.length > 0 ? (
         <div className="mt-5">

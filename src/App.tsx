@@ -13,6 +13,7 @@ import { TasksPanel } from './components/TasksPanel';
 import type { Task } from './types';
 import { autoCompletableTaskIds } from './lib/taskMatch';
 import { weekKeys } from './lib/date';
+import { Calendar } from './components/Calendar';
 
 function App() {
   const [state, setState] = useState<AppState>(() => loadState());
@@ -372,6 +373,7 @@ function App() {
             onToggle={toggleTask}
             onDelete={deleteTask}
             onChangeCategory={setTaskCategory}
+            llmProxyUrl={state.canvas?.proxyUrl}
           />
           <AssignmentsPanel
             state={state}
@@ -384,10 +386,17 @@ function App() {
           />
         </section>
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
-          {activeThreads.map((t) => (
-            <ThreadCard key={t.id} state={state} thread={t} />
-          ))}
+        <section className="space-y-3 content-start">
+          <Calendar
+            state={state}
+            activeDate={dateKey}
+            onSelectDate={setDateKey}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeThreads.map((t) => (
+              <ThreadCard key={t.id} state={state} thread={t} />
+            ))}
+          </div>
         </section>
       </main>
 

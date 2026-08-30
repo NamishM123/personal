@@ -32,6 +32,7 @@ function hydrateEntries(entries: Record<string, DayEntry>): Record<string, DayEn
       completedAssignments: Array.isArray(v.completedAssignments)
         ? v.completedAssignments
         : [],
+      savedAt: v.savedAt,
     };
   }
   return out;

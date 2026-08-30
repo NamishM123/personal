@@ -56,6 +56,75 @@ export function isConfigured(proxyUrl?: string): boolean {
   return typeof key === 'string' && key.length > 10;
 }
 
+/** Ask Groq which thread a task title belongs to. Returns the thread id or undefined. */
+export async function llmCategorizeTask(
+  title: string,
+  threads: Thread[],
+  proxyUrl?: string,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  if (!title.trim() || threads.length === 0) return undefined;
+  if (!isConfigured(proxyUrl)) return undefined;
+
+  const list = threads
+    .map((t) => `- ${t.id}: ${t.name} (${t.aliases.slice(0, 6).join(', ')})`)
+    .join('\n');
+  const system = `Classify a short task title into exactly one category. Return JSON only.
+
+Categories:
+${list}
+
+Rules:
+- Choose the single best match.
+- If nothing fits well, pick the most generic category (e.g. "personal" if present).
+- Return: { "thread_id": "<id>" } where id is one of the values above.`;
+
+  const body = {
+    model: MODEL,
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: title.trim() },
+    ],
+  };
+
+  let res: Response;
+  if (proxyUrl && proxyUrl.trim().length > 0) {
+    res = await fetch(`${proxyUrl.replace(/\/$/, '')}/api/groq`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } else {
+    const key = getEnvKey() ?? getLocalStorageKey();
+    if (!key) return undefined;
+    res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  }
+  if (!res.ok) return undefined;
+  try {
+    const json = (await res.json()) as {
+      choices: { message: { content: string } }[];
+    };
+    const content = json.choices?.[0]?.message?.content ?? '{}';
+    const parsed = JSON.parse(content) as { thread_id?: string };
+    const id = parsed.thread_id;
+    if (id && threads.some((t) => t.id === id)) return id;
+  } catch {
+    // fall through
+  }
+  return undefined;
+}
+
 export async function llmParse(
   text: string,
   threads: Thread[],

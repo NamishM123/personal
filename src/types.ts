@@ -37,6 +37,8 @@ export interface DayEntry {
   };
   /** Assignments completed on this day (Canvas ids or manual ids). */
   completedAssignments?: string[];
+  /** ISO time the user explicitly marked the day as saved / journaled. */
+  savedAt?: string;
 }
 
 export interface Assignment {

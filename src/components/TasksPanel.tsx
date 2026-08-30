@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AppState, Task } from '../types';
 import { todayKey, weekStart } from '../lib/date';
+import { isConfigured, llmCategorizeTask } from '../lib/llm';
 
 interface Props {
   state: AppState;
@@ -8,6 +9,7 @@ interface Props {
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
   onChangeCategory: (id: string, threadId: string | undefined) => void;
+  llmProxyUrl?: string;
 }
 
 function weekKey(date: Date = new Date()): string {
@@ -24,12 +26,15 @@ export function TasksPanel({
   onToggle,
   onDelete,
   onChangeCategory,
+  llmProxyUrl,
 }: Props) {
   const [scope, setScope] = useState<'day' | 'week'>('day');
   const [title, setTitle] = useState('');
   const [threadId, setThreadId] = useState<string>('');
+  const [autoBusy, setAutoBusy] = useState(false);
 
   const threads = state.threads;
+  const aiOn = isConfigured(llmProxyUrl);
 
   const today = todayKey();
   const wk = weekKey();
@@ -51,11 +56,13 @@ export function TasksPanel({
   const dayPct = dayTasks.length === 0 ? 0 : Math.round((dayDone / dayTasks.length) * 100);
   const weekPct = weekTasks.length === 0 ? 0 : Math.round((weekDone / weekTasks.length) * 100);
 
-  function submit() {
-    if (!title.trim()) return;
+  async function submit() {
+    const raw = title.trim();
+    if (!raw) return;
+    const id = crypto.randomUUID();
     onAdd({
-      id: crypto.randomUUID(),
-      title: title.trim(),
+      id,
+      title: raw,
       scope,
       scopeKey: scope === 'day' ? today : wk,
       createdAt: new Date().toISOString(),
@@ -63,6 +70,19 @@ export function TasksPanel({
       threadId: threadId || undefined,
     });
     setTitle('');
+
+    // If no manual category and Groq is available, ask it in the background.
+    if (!threadId && aiOn) {
+      setAutoBusy(true);
+      try {
+        const picked = await llmCategorizeTask(raw, threads, llmProxyUrl);
+        if (picked) onChangeCategory(id, picked);
+      } catch {
+        // ignore
+      } finally {
+        setAutoBusy(false);
+      }
+    }
   }
 
   return (
@@ -72,6 +92,18 @@ export function TasksPanel({
           <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
             <span className="inline-block w-1 h-4 rounded-full bg-teal-500" />
             Tasks
+            {aiOn && (
+              <span
+                className={`text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-full border ${
+                  autoBusy
+                    ? 'border-amber-400/40 text-amber-700 bg-amber-50 animate-pulse'
+                    : 'border-teal-500/40 text-teal-700 bg-teal-50'
+                }`}
+                title="New tasks are auto-categorized by Groq"
+              >
+                AI {autoBusy ? '…' : 'on'}
+              </span>
+            )}
           </h2>
           <p className="text-[11px] text-ink-faint mt-0.5">
             Ad-hoc targets, separate from Canvas.
