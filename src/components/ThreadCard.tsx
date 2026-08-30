@@ -13,9 +13,10 @@ import { WeekStrip } from './WeekStrip';
 interface Props {
   state: AppState;
   thread: Thread;
+  onOpen?: () => void;
 }
 
-export function ThreadCard({ state, thread }: Props) {
+export function ThreadCard({ state, thread, onOpen }: Props) {
   const today = todayKey();
   const dToday = dayTotal(state, thread.id, today);
   const dGoal = dailyGoal(thread);
@@ -30,7 +31,11 @@ export function ThreadCard({ state, thread }: Props) {
   const filled = wPct >= 100;
 
   return (
-    <div className="card p-4 hover:shadow-pop transition-shadow relative overflow-hidden">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="card p-4 hover:shadow-pop hover:border-line2 transition-all relative overflow-hidden text-left w-full cursor-pointer"
+    >
       {/* Ambient color wash in the top-right */}
       <div
         aria-hidden
@@ -94,6 +99,6 @@ export function ThreadCard({ state, thread }: Props) {
 
       {/* Percent-position wPctClamped kept for aria/testing; visually already carried by the bar */}
       <span className="sr-only">{wPctClamped}% of weekly goal</span>
-    </div>
+    </button>
   );
 }

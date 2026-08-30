@@ -63,6 +63,10 @@ export interface Task {
   threadId?: string;
   /** true when a journal match auto-checked it (so we don't fight the user). */
   autoCompleted?: boolean;
+  /** Optional link (e.g. a job posting URL). */
+  url?: string;
+  /** Category-specific metadata; e.g. { company: "Anthropic" } for Job Apps. */
+  meta?: Record<string, string>;
 }
 
 export interface AppState {

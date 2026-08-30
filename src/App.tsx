@@ -14,11 +14,13 @@ import type { Task } from './types';
 import { autoCompletableTaskIds } from './lib/taskMatch';
 import { weekKeys } from './lib/date';
 import { Calendar } from './components/Calendar';
+import { ThreadDetail } from './components/ThreadDetail';
 
 function App() {
   const [state, setState] = useState<AppState>(() => loadState());
   const [dateKey, setDateKey] = useState<string>(() => todayKey());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailThreadId, setDetailThreadId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -394,7 +396,12 @@ function App() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {activeThreads.map((t) => (
-              <ThreadCard key={t.id} state={state} thread={t} />
+              <ThreadCard
+                key={t.id}
+                state={state}
+                thread={t}
+                onOpen={() => setDetailThreadId(t.id)}
+              />
             ))}
           </div>
         </section>
@@ -416,6 +423,23 @@ function App() {
           onChange={updateThreads}
         />
       )}
+
+      {detailThreadId &&
+        (() => {
+          const t = activeThreads.find((x) => x.id === detailThreadId);
+          if (!t) return null;
+          return (
+            <ThreadDetail
+              state={state}
+              thread={t}
+              dateKey={dateKey}
+              onClose={() => setDetailThreadId(null)}
+              onAddTask={addTask}
+              onToggleTask={toggleTask}
+              onDeleteTask={deleteTask}
+            />
+          );
+        })()}
     </div>
   );
 }

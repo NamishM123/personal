@@ -319,13 +319,36 @@ function TaskList({
                     title={cat.name}
                   />
                 )}
-                <span
-                  className={`flex-1 text-sm truncate ${
-                    t.done ? 'line-through text-ink-faint' : 'text-ink'
-                  }`}
-                >
-                  {t.title}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className={`text-sm truncate ${
+                      t.done ? 'line-through text-ink-faint' : 'text-ink'
+                    }`}
+                  >
+                    {t.title}
+                  </div>
+                  {(t.meta?.company || t.url) && (
+                    <div className="text-[11px] text-ink-faint flex items-center gap-1.5 truncate">
+                      {t.meta?.company && (
+                        <span className="font-medium text-ink-muted">
+                          {t.meta.company}
+                        </span>
+                      )}
+                      {t.meta?.company && t.url && <span>·</span>}
+                      {t.url && (
+                        <a
+                          href={t.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:text-teal-700 underline truncate"
+                        >
+                          link
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {t.done && t.autoCompleted && (
                   <span
                     className="text-[9px] text-teal-700 font-semibold uppercase tracking-wider"
