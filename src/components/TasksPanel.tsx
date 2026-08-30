@@ -7,6 +7,7 @@ interface Props {
   onAdd: (task: Task) => void;
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
+  onChangeCategory: (id: string, threadId: string | undefined) => void;
 }
 
 function weekKey(date: Date = new Date()): string {
@@ -17,9 +18,18 @@ function weekKey(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-export function TasksPanel({ state, onAdd, onToggle, onDelete }: Props) {
+export function TasksPanel({
+  state,
+  onAdd,
+  onToggle,
+  onDelete,
+  onChangeCategory,
+}: Props) {
   const [scope, setScope] = useState<'day' | 'week'>('day');
   const [title, setTitle] = useState('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  const threads = state.threads;
 
   const today = todayKey();
   const wk = weekKey();
@@ -50,6 +60,7 @@ export function TasksPanel({ state, onAdd, onToggle, onDelete }: Props) {
       scopeKey: scope === 'day' ? today : wk,
       createdAt: new Date().toISOString(),
       done: false,
+      threadId: threadId || undefined,
     });
     setTitle('');
   }
@@ -79,7 +90,7 @@ export function TasksPanel({ state, onAdd, onToggle, onDelete }: Props) {
 
       <MiniBars dayPct={dayPct} weekPct={weekPct} />
 
-      <div className="mt-3 flex items-center gap-1.5">
+      <div className="mt-3 flex items-center gap-1.5 flex-wrap">
         <div className="flex rounded-lg border border-line overflow-hidden text-xs">
           {(['day', 'week'] as const).map((s) => (
             <button
@@ -105,7 +116,12 @@ export function TasksPanel({ state, onAdd, onToggle, onDelete }: Props) {
           placeholder={
             scope === 'day' ? 'Add a task for today…' : 'Add a task for this week…'
           }
-          className="field !py-1.5 !text-sm flex-1"
+          className="field !py-1.5 !text-sm flex-1 min-w-[180px]"
+        />
+        <CategorySelect
+          threads={threads}
+          value={threadId}
+          onChange={setThreadId}
         />
         <button
           className="btn-primary text-xs"
@@ -120,18 +136,64 @@ export function TasksPanel({ state, onAdd, onToggle, onDelete }: Props) {
         <TaskList
           label="Today"
           items={dayTasks}
+          threads={threads}
           onToggle={onToggle}
           onDelete={onDelete}
+          onChangeCategory={onChangeCategory}
           emptyText="No day tasks yet."
         />
         <TaskList
           label="This week"
           items={weekTasks}
+          threads={threads}
           onToggle={onToggle}
           onDelete={onDelete}
+          onChangeCategory={onChangeCategory}
           emptyText="No weekly tasks yet."
         />
       </div>
+
+      <p className="text-[11px] text-ink-faint mt-3">
+        Tip: with a category set, completing a task bumps that thread's bar.
+        Writing about it in the Journal auto-checks matching tasks.
+      </p>
+    </div>
+  );
+}
+
+function CategorySelect({
+  threads,
+  value,
+  onChange,
+  compact = false,
+}: {
+  threads: { id: string; name: string; color: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  compact?: boolean;
+}) {
+  const cur = threads.find((t) => t.id === value);
+  return (
+    <div className="relative inline-flex items-center">
+      <span
+        className="pointer-events-none absolute left-2 w-1.5 h-1.5 rounded-full"
+        style={{ backgroundColor: cur?.color ?? '#D1D5DB' }}
+      />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`field !py-1.5 !pl-6 !pr-6 text-xs appearance-none cursor-pointer ${
+          compact ? '!w-[110px]' : ''
+        }`}
+        title="Category"
+      >
+        <option value="">No category</option>
+        {threads.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -173,14 +235,18 @@ function MiniBars({ dayPct, weekPct }: { dayPct: number; weekPct: number }) {
 function TaskList({
   label,
   items,
+  threads,
   onToggle,
   onDelete,
+  onChangeCategory,
   emptyText,
 }: {
   label: string;
   items: Task[];
+  threads: { id: string; name: string; color: string }[];
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
+  onChangeCategory: (id: string, threadId: string | undefined) => void;
   emptyText: string;
 }) {
   return (
@@ -194,38 +260,67 @@ function TaskList({
         </div>
       ) : (
         <ul className="space-y-1">
-          {items.map((t) => (
-            <li
-              key={t.id}
-              className={`group flex items-center gap-2 p-2 rounded-lg border transition ${
-                t.done
-                  ? 'border-teal-200 bg-teal-50/50'
-                  : 'border-line bg-white hover:border-line2'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={t.done}
-                onChange={(e) => onToggle(t.id, e.target.checked)}
-                className="w-4 h-4 rounded border-line accent-teal-600"
-              />
-              <span
-                className={`flex-1 text-sm truncate ${
-                  t.done ? 'line-through text-ink-faint' : 'text-ink'
+          {items.map((t) => {
+            const cat = threads.find((th) => th.id === t.threadId);
+            return (
+              <li
+                key={t.id}
+                className={`group flex items-center gap-2 p-2 rounded-lg border transition ${
+                  t.done
+                    ? 'border-teal-200 bg-teal-50/50'
+                    : 'border-line bg-white hover:border-line2'
                 }`}
               >
-                {t.title}
-              </span>
-              <button
-                onClick={() => onDelete(t.id)}
-                className="text-ink-faint hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition"
-                title="Delete task"
-                aria-label="Delete task"
-              >
-                ×
-              </button>
-            </li>
-          ))}
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={(e) => onToggle(t.id, e.target.checked)}
+                  className="w-4 h-4 rounded border-line accent-teal-600"
+                />
+                {cat && (
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: cat.color,
+                      boxShadow: `0 0 0 3px ${cat.color}1a`,
+                    }}
+                    title={cat.name}
+                  />
+                )}
+                <span
+                  className={`flex-1 text-sm truncate ${
+                    t.done ? 'line-through text-ink-faint' : 'text-ink'
+                  }`}
+                >
+                  {t.title}
+                </span>
+                {t.done && t.autoCompleted && (
+                  <span
+                    className="text-[9px] text-teal-700 font-semibold uppercase tracking-wider"
+                    title="Auto-checked from your journal"
+                  >
+                    Auto
+                  </span>
+                )}
+                <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
+                  <CategorySelect
+                    threads={threads}
+                    value={t.threadId ?? ''}
+                    onChange={(v) => onChangeCategory(t.id, v || undefined)}
+                    compact
+                  />
+                  <button
+                    onClick={() => onDelete(t.id)}
+                    className="text-ink-faint hover:text-red-500 text-xs"
+                    title="Delete task"
+                    aria-label="Delete task"
+                  >
+                    ×
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

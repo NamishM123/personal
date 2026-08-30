@@ -20,14 +20,35 @@ export function assignmentsCompletedOn(state: AppState, dateKey: string): number
   return state.entries[dateKey]?.completedAssignments?.length ?? 0;
 }
 
+/** Tasks credited to this thread that were completed on this date. */
+function tasksCompletedForThreadOn(
+  state: AppState,
+  threadId: string,
+  dateKey: string,
+): number {
+  const tasks = state.tasks ?? {};
+  let n = 0;
+  for (const t of Object.values(tasks)) {
+    if (!t.done || !t.completedAt || t.threadId !== threadId) continue;
+    if (t.completedAt.slice(0, 10) === dateKey) n += 1;
+  }
+  return n;
+}
+
 export function dayTotal(state: AppState, threadId: string, dateKey: string): number {
   const fromNarrative = detectionsForDay(state, dateKey)
     .filter((d) => d.threadId === threadId)
     .reduce((s, d) => s + d.amount, 0);
-  if (threadId === COURSEWORK_ID) {
-    return fromNarrative + assignmentsCompletedOn(state, dateKey);
-  }
-  return fromNarrative;
+
+  const thread = state.threads.find((t) => t.id === threadId);
+  const taskCount = tasksCompletedForThreadOn(state, threadId, dateKey);
+  const perTask = thread?.defaultAmount ?? 1;
+  const fromTasks = taskCount * perTask;
+
+  const fromAssignments =
+    threadId === COURSEWORK_ID ? assignmentsCompletedOn(state, dateKey) : 0;
+
+  return fromNarrative + fromTasks + fromAssignments;
 }
 
 export function weekTotal(

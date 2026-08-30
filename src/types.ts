@@ -57,6 +57,10 @@ export interface Task {
   createdAt: string; // ISO
   done: boolean;
   completedAt?: string; // ISO
+  /** Optional thread this task rolls up to. Completing it bumps that thread's bar. */
+  threadId?: string;
+  /** true when a journal match auto-checked it (so we don't fight the user). */
+  autoCompleted?: boolean;
 }
 
 export interface AppState {

@@ -11,6 +11,8 @@ import { Ring } from './components/Ring';
 import { AssignmentsPanel } from './components/AssignmentsPanel';
 import { TasksPanel } from './components/TasksPanel';
 import type { Task } from './types';
+import { autoCompletableTaskIds } from './lib/taskMatch';
+import { weekKeys } from './lib/date';
 
 function App() {
   const [state, setState] = useState<AppState>(() => loadState());
@@ -77,10 +79,37 @@ function App() {
   }, []);
 
   function upsertEntry(next: DayEntry) {
-    setState((s) => ({
-      ...s,
-      entries: { ...s.entries, [next.date]: next },
-    }));
+    setState((s) => {
+      const entries = { ...s.entries, [next.date]: next };
+      // Auto-complete matching tasks — only for today's entry, only among
+      // open tasks whose scope matches (day: same date, week: same week).
+      const tasksMap = s.tasks ?? {};
+      if (next.date === todayKey()) {
+        const wk = weekKeys(new Date());
+        const relevant = Object.values(tasksMap).filter((t) => {
+          if (t.done) return false;
+          if (t.scope === 'day') return t.scopeKey === next.date;
+          return wk.includes(next.date) && wk.some((k) => k === t.scopeKey || wk.includes(t.scopeKey));
+        });
+        const matched = autoCompletableTaskIds(next.narrative, relevant);
+        if (matched.length > 0) {
+          const nowIso = new Date().toISOString();
+          const nextTasks = { ...tasksMap };
+          for (const id of matched) {
+            const t = nextTasks[id];
+            if (!t) continue;
+            nextTasks[id] = {
+              ...t,
+              done: true,
+              completedAt: nowIso,
+              autoCompleted: true,
+            };
+          }
+          return { ...s, entries, tasks: nextTasks };
+        }
+      }
+      return { ...s, entries };
+    });
   }
 
   function updateThreads(threads: Thread[]) {
@@ -134,6 +163,17 @@ function App() {
             completedAt: done ? new Date().toISOString() : undefined,
           },
         },
+      };
+    });
+  }
+
+  function setTaskCategory(id: string, threadId: string | undefined) {
+    setState((s) => {
+      const existing = s.tasks?.[id];
+      if (!existing) return s;
+      return {
+        ...s,
+        tasks: { ...s.tasks, [id]: { ...existing, threadId } },
       };
     });
   }
@@ -331,6 +371,7 @@ function App() {
             onAdd={addTask}
             onToggle={toggleTask}
             onDelete={deleteTask}
+            onChangeCategory={setTaskCategory}
           />
           <AssignmentsPanel
             state={state}
